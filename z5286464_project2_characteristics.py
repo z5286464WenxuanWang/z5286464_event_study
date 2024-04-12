@@ -1,4 +1,4 @@
-""" zid_project2_characteristics.py
+""" z5286464_project2_characteristics.py
 
 """
 
