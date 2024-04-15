@@ -105,32 +105,23 @@ def read_prc_csv(tic, start, end, prc_col='Adj Close'):
     """
 
     # <COMPLETE THIS PART>
-    # Ensure cross-platform compatibility for file paths
+    def read_prc_csv(tic, start, end, prc_col='Adj Close'):
     file_path = os.path.join(cfg.DATADIR, f"{tic.lower()}_prc.csv")
-
-    # Load the CSV file ensuring 'Date' column is parsed as datetime
     df = pd.read_csv(file_path, parse_dates=['Date'])
-
-    # Set the 'Date' column as the index
     df.set_index('Date', inplace=True)
-
-    # Ensure the index is sorted in case it isn't already
     df.sort_index(inplace=True)
-
-    # Convert start and end to pandas Timestamp to ensure comparison works properly
+    
     start_date = pd.to_datetime(start)
     end_date = pd.to_datetime(end)
-
-    # Filter based on the start and end dates
-    df = df[(df.index >= start_date) & (df.index <= end_date)]
-
-    # Select the price column and drop any rows with NaN values
+    
+    if df.index[0] > start_date or df.index[-1] < end_date:
+        print(f"Warning: Data range for {tic} does not fully cover the specified period.")
+    
+    df = df.loc[start_date:end_date]
     ser = df[prc_col].dropna()
-
-    # Rename the Series to the ticker's name in lowercase
     ser.name = tic.lower()
-
     return ser
+
 
 
 # ----------------------------------------------------------------------------
@@ -328,24 +319,18 @@ def monthly_return_cal(prc):
 
     """
     # <COMPLETE THIS PART>
-    # Resample to get the last price of each month and compute the percent change
-    monthly_returns = prc.resample('ME').last().pct_change().dropna()
-
-    # Convert to PeriodIndex for consistency and readability
-    monthly_returns.index = monthly_returns.index.to_period('M')
-
-    # Filter out any months that don't have at least 18 days of data
-    monthly_days = prc.resample('ME').size()
-    valid_months = monthly_days[monthly_days >= 18].index
+    def monthly_return_cal(prc):
+    monthly_prices = prc.resample('ME').last()
+    monthly_returns = monthly_prices.pct_change().dropna()
+    
+    monthly_data_counts = prc.resample('ME').count()
+    valid_months = monthly_data_counts[monthly_data_counts >= 18].index
     monthly_returns = monthly_returns[monthly_returns.index.isin(valid_months)]
-
-    # Rename the index
-    monthly_returns.index.name = 'Year_Month'
-
-    # Set the series name to be the same as the input 'prc' series
+    
+    monthly_returns.index = monthly_returns.index.to_period('M')
     monthly_returns.name = prc.name
-
     return monthly_returns
+
 
 
 # ----------------------------------------------------------------------------
