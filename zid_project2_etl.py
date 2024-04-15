@@ -10,12 +10,10 @@
 #       For details, review the import statements in zid_project2_main.py
 
 # <COMPLETE THIS PART>
-import os
 import pandas as pd
 import config as cfg
 import zid_project2_characteristics as cha
 import zid_project2_portfolio as pf
-import toolkit_config as tcfg
 import util
 
 
@@ -105,35 +103,28 @@ def read_prc_csv(tic, start, end, prc_col='Adj Close'):
     """
 
     # <COMPLETE THIS PART>
-    def read_prc_csv(tic, start, end, prc_col='Adj Close'):
-    file_path = os.path.join(cfg.DATADIR, f"{tic.lower()}_prc.csv")
-    try:
-        df = pd.read_csv(file_path, parse_dates=['Date'])
-        if prc_col not in df.columns:
-            raise ValueError(f"Column {prc_col} not found in {file_path}")
-    except FileNotFoundError:
-        print(f"File {file_path} not found.")
-        return pd.Series(name=tic.lower())
-    except pd.errors.EmptyDataError:
-        print(f"No data in {file_path}, file is empty.")
-        return pd.Series(name=tic.lower())
-    
+    # Adjust the file path based on your project's structure
+    file_path = f"{cfg.DATADIR}/{tic.lower()}_prc.csv"
+
+    # Load the CSV file
+    df = pd.read_csv(file_path, parse_dates=['Date'])
+
+    # Set the 'Date' column as the index
     df.set_index('Date', inplace=True)
+
+    # Make sure the index is sorted
     df.sort_index(inplace=True)
-    
-    start_date = pd.to_datetime(start)
-    end_date = pd.to_datetime(end)
-    
-    if df.index[0] > start_date or df.index[-1] < end_date:
-        print(f"Warning: Data range for {tic} does not fully cover the specified period from {start} to {end}.")
-    
-    df = df.loc[start_date:end_date]
+
+    # Filter based on the start and end dates
+    df = df[(df.index >= start) & (df.index <= end)]
+
+    # Select the price column and drop any rows with NaN values
     ser = df[prc_col].dropna()
+
+    # Rename the Series to the ticker's name
     ser.name = tic.lower()
+
     return ser
-
-
-
 
 # ----------------------------------------------------------------------------
 # Part 4.3: Complete the daily_return_cal function
@@ -221,14 +212,13 @@ def daily_return_cal(prc):
 
     """
     # <COMPLETE THIS PART>
-    def daily_return_cal(prc):
-    if prc.empty:
-        return pd.Series(name=prc.name)
-    
-    daily_returns = prc.pct_change().dropna()
-    daily_returns.name = prc.name
-    return daily_returns
+    # Calculate the daily returns as a percentage change
+    daily_returns = prc.pct_change().dropna()  # dropna() removes any NaNs that might have occurred from the calculation
 
+    # Set the name of the series to be the same as the input series 'prc'
+    daily_returns.name = prc.name
+
+    return daily_returns
 
 
 # ----------------------------------------------------------------------------
@@ -332,22 +322,29 @@ def monthly_return_cal(prc):
 
     """
     # <COMPLETE THIS PART>
-    def monthly_return_cal(prc):
-    if prc.empty:
-        return pd.Series(name=prc.name)
-    
-    monthly_prices = prc.resample('ME').last()
-    monthly_returns = monthly_prices.pct_change().dropna()
-    
-    monthly_data_counts = prc.resample('ME').count()
-    valid_months = monthly_data_counts[monthly_data_counts >= 18].index
-    monthly_returns = monthly_returns[monthly_returns.index.isin(valid_months)]
-    
-    monthly_returns.index = monthly_returns.index.to_period('M')
-    monthly_returns.name = prc.name
-    return monthly_returns
+    # Resample the price data to get the last price of each month
+    monthly_price = prc.resample('M').last()
 
+    # Calculate the percentage change to get monthly returns and drop any missing values
+    monthly_return = monthly_price.pct_change().dropna()
 
+    # Create a boolean mask where months with at least 18 data points are True
+    count_month = prc.resample('M').count() >= 18
+
+    # Apply the mask to filter the monthly returns, keeping only months with sufficient data
+    monthly_return = monthly_return[count_month]
+
+    # Convert the monthly return's index from datetime to period format with monthly frequency
+    monthly_return.index = monthly_return.index.to_period('M')
+
+    # Rename the index to indicate the year and month of the return
+    monthly_return.index.name = 'Year_Month'
+
+    # Assign the original price series name to the monthly returns series
+    monthly_return.name = prc.name
+
+    # Return the monthly returns after dropping any remaining missing values
+    return monthly_return.dropna()
 
 
 # ----------------------------------------------------------------------------
@@ -461,27 +458,33 @@ def aj_ret_dict(tickers, start, end):
         ----------------------------------------
     """
     # <COMPLETE THIS PART>
-    def aj_ret_dict(tickers, start, end):
     daily_returns_dict = {}
     monthly_returns_dict = {}
 
     for ticker in tickers:
+        # Get price data for ticker
         prc = read_prc_csv(ticker, start, end)
-        if not prc.empty:
-            daily_returns = daily_return_cal(prc)
-            monthly_returns = monthly_return_cal(prc)
-            daily_returns_dict[ticker.lower()] = daily_returns
-            monthly_returns_dict[ticker.lower()] = monthly_returns
 
+        # Calculate daily and monthly returns
+        daily_returns = daily_return_cal(prc)
+        monthly_returns = monthly_return_cal(prc)
+
+        # Add the returns series to the respective dictionaries
+        daily_returns_dict[ticker.lower()] = daily_returns
+        monthly_returns_dict[ticker.lower()] = monthly_returns
+
+    # Convert the dictionaries to DataFrames
     daily_returns_df = pd.DataFrame(daily_returns_dict)
     monthly_returns_df = pd.DataFrame(monthly_returns_dict)
 
+    # Rename index as specified
     daily_returns_df.index.name = 'Date'
     monthly_returns_df.index.name = 'Year_Month'
 
+    # Assemble the final dictionary
     ret_dict = {"Daily": daily_returns_df, "Monthly": monthly_returns_df}
-    return ret_dict
 
+    return ret_dict
 
 
 # ----------------------------------------------------------------------------
@@ -558,18 +561,18 @@ def _test_aj_ret_dict(tickers, start, end):
 
 if __name__ == "__main__":
     pass
-    # test read_prc_csv function
+    #test read_prc_csv function
     _test_read_prc_csv()
 
-    # # use made-up series to test daily_return_cal function
+    # use made-up series to test daily_return_cal function
     _test_daily_return_cal()
-    # # use AAPL prc series to test daily_return_cal function
+    # use AAPL prc series to test daily_return_cal function
     ser_price = read_prc_csv(tic='AAPL', start='2020-09-03', end='2020-09-09')
     _test_daily_return_cal(made_up_data=False, ser_prc=ser_price)
-    #
-    # # use made-up series to test daily_return_cal function
+
+    # use made-up series to test daily_return_cal function
     _test_monthly_return_cal()
-    # # use AAPL prc series to test daily_return_cal function
+    # use AAPL prc series to test daily_return_cal function
     ser_price = read_prc_csv(tic='AAPL', start='2020-08-31', end='2021-01-10')
     _test_monthly_return_cal(made_up_data=False, ser_prc=ser_price)
     # test aj_ret_dict function
