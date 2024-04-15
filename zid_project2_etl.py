@@ -10,10 +10,12 @@
 #       For details, review the import statements in zid_project2_main.py
 
 # <COMPLETE THIS PART>
+import os
 import pandas as pd
 import config as cfg
 import zid_project2_characteristics as cha
 import zid_project2_portfolio as pf
+import toolkit_config as tcfg
 import util
 
 
@@ -103,28 +105,33 @@ def read_prc_csv(tic, start, end, prc_col='Adj Close'):
     """
 
     # <COMPLETE THIS PART>
-    # Adjust the file path based on your project's structure
-    file_path = f"{cfg.DATADIR}/{tic.lower()}_prc.csv"
+    # Ensure cross-platform compatibility for file paths
+    file_path = os.path.join(cfg.DATADIR, f"{tic.lower()}_prc.csv")
 
-    # Load the CSV file
+    # Load the CSV file ensuring 'Date' column is parsed as datetime
     df = pd.read_csv(file_path, parse_dates=['Date'])
 
     # Set the 'Date' column as the index
     df.set_index('Date', inplace=True)
 
-    # Make sure the index is sorted
+    # Ensure the index is sorted in case it isn't already
     df.sort_index(inplace=True)
 
+    # Convert start and end to pandas Timestamp to ensure comparison works properly
+    start_date = pd.to_datetime(start)
+    end_date = pd.to_datetime(end)
+
     # Filter based on the start and end dates
-    df = df[(df.index >= start) & (df.index <= end)]
+    df = df[(df.index >= start_date) & (df.index <= end_date)]
 
     # Select the price column and drop any rows with NaN values
     ser = df[prc_col].dropna()
 
-    # Rename the Series to the ticker's name
+    # Rename the Series to the ticker's name in lowercase
     ser.name = tic.lower()
 
     return ser
+
 
 # ----------------------------------------------------------------------------
 # Part 4.3: Complete the daily_return_cal function
@@ -212,8 +219,7 @@ def daily_return_cal(prc):
 
     """
     # <COMPLETE THIS PART>
-    # Calculate the daily returns as a percentage change
-    daily_returns = prc.pct_change().dropna()  # dropna() removes any NaNs that might have occurred from the calculation
+    daily_returns = prc.pct_change().dropna() # dropna() removes any NaNs that might have occurred from the calculation
 
     # Set the name of the series to be the same as the input series 'prc'
     daily_returns.name = prc.name
@@ -323,13 +329,13 @@ def monthly_return_cal(prc):
     """
     # <COMPLETE THIS PART>
     # Resample to get the last price of each month and compute the percent change
-    monthly_returns = prc.resample('M').last().pct_change().dropna()
+    monthly_returns = prc.resample('ME').last().pct_change().dropna()
 
     # Convert to PeriodIndex for consistency and readability
     monthly_returns.index = monthly_returns.index.to_period('M')
 
     # Filter out any months that don't have at least 18 days of data
-    monthly_days = prc.resample('M').size()
+    monthly_days = prc.resample('ME').size()
     valid_months = monthly_days[monthly_days >= 18].index
     monthly_returns = monthly_returns[monthly_returns.index.isin(valid_months)]
 
@@ -556,20 +562,19 @@ def _test_aj_ret_dict(tickers, start, end):
 
 if __name__ == "__main__":
     pass
-    #test read_prc_csv function
+    # test read_prc_csv function
     _test_read_prc_csv()
 
-    # use made-up series to test daily_return_cal function
+    # # use made-up series to test daily_return_cal function
     _test_daily_return_cal()
-    # use AAPL prc series to test daily_return_cal function
+    # # use AAPL prc series to test daily_return_cal function
     ser_price = read_prc_csv(tic='AAPL', start='2020-09-03', end='2020-09-09')
     _test_daily_return_cal(made_up_data=False, ser_prc=ser_price)
-
-    # use made-up series to test daily_return_cal function
+    #
+    # # use made-up series to test daily_return_cal function
     _test_monthly_return_cal()
-    # use AAPL prc series to test daily_return_cal function
+    # # use AAPL prc series to test daily_return_cal function
     ser_price = read_prc_csv(tic='AAPL', start='2020-08-31', end='2021-01-10')
     _test_monthly_return_cal(made_up_data=False, ser_prc=ser_price)
     # test aj_ret_dict function
     _test_aj_ret_dict(['AAPL', 'TSLA'], start='2010-06-25', end='2010-08-05')
-
