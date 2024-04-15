@@ -105,25 +105,29 @@ def read_prc_csv(tic, start, end, prc_col='Adj Close'):
     """
 
     # <COMPLETE THIS PART>
-    # Adjust the file path based on your project's structure
-    file_path = f"{cfg.DATADIR}/{tic.lower()}_prc.csv"
+    # Ensure cross-platform compatibility for file paths
+    file_path = os.path.join(cfg.DATADIR, f"{tic.lower()}_prc.csv")
 
-    # Load the CSV file
+    # Load the CSV file ensuring 'Date' column is parsed as datetime
     df = pd.read_csv(file_path, parse_dates=['Date'])
 
     # Set the 'Date' column as the index
     df.set_index('Date', inplace=True)
 
-    # Make sure the index is sorted
+    # Ensure the index is sorted in case it isn't already
     df.sort_index(inplace=True)
 
+    # Convert start and end to pandas Timestamp to ensure comparison works properly
+    start_date = pd.to_datetime(start)
+    end_date = pd.to_datetime(end)
+
     # Filter based on the start and end dates
-    df = df[(df.index >= start) & (df.index <= end)]
+    df = df[(df.index >= start_date) & (df.index <= end_date)]
 
     # Select the price column and drop any rows with NaN values
     ser = df[prc_col].dropna()
 
-    # Rename the Series to the ticker's name
+    # Rename the Series to the ticker's name in lowercase
     ser.name = tic.lower()
 
     return ser
@@ -214,8 +218,7 @@ def daily_return_cal(prc):
 
     """
     # <COMPLETE THIS PART>
-    # Calculate the daily returns as a percentage change
-    daily_returns = prc.pct_change().dropna()  # dropna() removes any NaNs that might have occurred from the calculation
+    daily_returns = prc.pct_change().dropna() # dropna() removes any NaNs that might have occurred from the calculation
 
     # Set the name of the series to be the same as the input series 'prc'
     daily_returns.name = prc.name
