@@ -107,7 +107,17 @@ def read_prc_csv(tic, start, end, prc_col='Adj Close'):
     # <COMPLETE THIS PART>
     def read_prc_csv(tic, start, end, prc_col='Adj Close'):
     file_path = os.path.join(cfg.DATADIR, f"{tic.lower()}_prc.csv")
-    df = pd.read_csv(file_path, parse_dates=['Date'])
+    try:
+        df = pd.read_csv(file_path, parse_dates=['Date'])
+        if prc_col not in df.columns:
+            raise ValueError(f"Column {prc_col} not found in {file_path}")
+    except FileNotFoundError:
+        print(f"File {file_path} not found.")
+        return pd.Series(name=tic.lower())
+    except pd.errors.EmptyDataError:
+        print(f"No data in {file_path}, file is empty.")
+        return pd.Series(name=tic.lower())
+    
     df.set_index('Date', inplace=True)
     df.sort_index(inplace=True)
     
@@ -115,12 +125,13 @@ def read_prc_csv(tic, start, end, prc_col='Adj Close'):
     end_date = pd.to_datetime(end)
     
     if df.index[0] > start_date or df.index[-1] < end_date:
-        print(f"Warning: Data range for {tic} does not fully cover the specified period.")
+        print(f"Warning: Data range for {tic} does not fully cover the specified period from {start} to {end}.")
     
     df = df.loc[start_date:end_date]
     ser = df[prc_col].dropna()
     ser.name = tic.lower()
     return ser
+
 
 
 
@@ -210,12 +221,14 @@ def daily_return_cal(prc):
 
     """
     # <COMPLETE THIS PART>
-    daily_returns = prc.pct_change().dropna() # dropna() removes any NaNs that might have occurred from the calculation
-
-    # Set the name of the series to be the same as the input series 'prc'
+    def daily_return_cal(prc):
+    if prc.empty:
+        return pd.Series(name=prc.name)
+    
+    daily_returns = prc.pct_change().dropna()
     daily_returns.name = prc.name
-
     return daily_returns
+
 
 
 # ----------------------------------------------------------------------------
@@ -320,6 +333,9 @@ def monthly_return_cal(prc):
     """
     # <COMPLETE THIS PART>
     def monthly_return_cal(prc):
+    if prc.empty:
+        return pd.Series(name=prc.name)
+    
     monthly_prices = prc.resample('ME').last()
     monthly_returns = monthly_prices.pct_change().dropna()
     
@@ -330,6 +346,7 @@ def monthly_return_cal(prc):
     monthly_returns.index = monthly_returns.index.to_period('M')
     monthly_returns.name = prc.name
     return monthly_returns
+
 
 
 
@@ -444,33 +461,27 @@ def aj_ret_dict(tickers, start, end):
         ----------------------------------------
     """
     # <COMPLETE THIS PART>
+    def aj_ret_dict(tickers, start, end):
     daily_returns_dict = {}
     monthly_returns_dict = {}
 
     for ticker in tickers:
-        # Get price data for ticker
         prc = read_prc_csv(ticker, start, end)
+        if not prc.empty:
+            daily_returns = daily_return_cal(prc)
+            monthly_returns = monthly_return_cal(prc)
+            daily_returns_dict[ticker.lower()] = daily_returns
+            monthly_returns_dict[ticker.lower()] = monthly_returns
 
-        # Calculate daily and monthly returns
-        daily_returns = daily_return_cal(prc)
-        monthly_returns = monthly_return_cal(prc)
-
-        # Add the returns series to the respective dictionaries
-        daily_returns_dict[ticker.lower()] = daily_returns
-        monthly_returns_dict[ticker.lower()] = monthly_returns
-
-    # Convert the dictionaries to DataFrames
     daily_returns_df = pd.DataFrame(daily_returns_dict)
     monthly_returns_df = pd.DataFrame(monthly_returns_dict)
 
-    # Rename index as specified
     daily_returns_df.index.name = 'Date'
     monthly_returns_df.index.name = 'Year_Month'
 
-    # Assemble the final dictionary
     ret_dict = {"Daily": daily_returns_df, "Monthly": monthly_returns_df}
-
     return ret_dict
+
 
 
 # ----------------------------------------------------------------------------
