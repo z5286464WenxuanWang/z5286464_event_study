@@ -10,10 +10,12 @@
 #       For details, review the import statements in zid_project2_main.py
 
 # <COMPLETE THIS PART>
+import os
 import pandas as pd
 import config as cfg
 import zid_project2_characteristics as cha
 import zid_project2_portfolio as pf
+import toolkit_config as tcfg
 import util
 
 
@@ -103,25 +105,29 @@ def read_prc_csv(tic, start, end, prc_col='Adj Close'):
     """
 
     # <COMPLETE THIS PART>
-    # Adjust the file path based on your project's structure
-    file_path = f"{cfg.DATADIR}/{tic.lower()}_prc.csv"
+    # Ensure cross-platform compatibility for file paths
+    file_path = os.path.join(cfg.DATADIR, f"{tic.lower()}_prc.csv")
 
-    # Load the CSV file
+    # Load the CSV file ensuring 'Date' column is parsed as datetime
     df = pd.read_csv(file_path, parse_dates=['Date'])
 
     # Set the 'Date' column as the index
     df.set_index('Date', inplace=True)
 
-    # Make sure the index is sorted
+    # Ensure the index is sorted in case it isn't already
     df.sort_index(inplace=True)
 
+    # Convert start and end to pandas Timestamp to ensure comparison works properly
+    start_date = pd.to_datetime(start)
+    end_date = pd.to_datetime(end)
+
     # Filter based on the start and end dates
-    df = df[(df.index >= start) & (df.index <= end)]
+    df = df[(df.index >= start_date) & (df.index <= end_date)]
 
     # Select the price column and drop any rows with NaN values
     ser = df[prc_col].dropna()
 
-    # Rename the Series to the ticker's name
+    # Rename the Series to the ticker's name in lowercase
     ser.name = tic.lower()
 
     return ser
@@ -212,8 +218,7 @@ def daily_return_cal(prc):
 
     """
     # <COMPLETE THIS PART>
-    # Calculate the daily returns as a percentage change
-    daily_returns = prc.pct_change().dropna()  # dropna() removes any NaNs that might have occurred from the calculation
+    daily_returns = prc.pct_change().dropna() # dropna() removes any NaNs that might have occurred from the calculation
 
     # Set the name of the series to be the same as the input series 'prc'
     daily_returns.name = prc.name
@@ -322,24 +327,29 @@ def monthly_return_cal(prc):
 
     """
     # <COMPLETE THIS PART>
-    # Resample to get the last price of each month and compute the percent change
-    monthly_returns = prc.resample('M').last().pct_change().dropna()
+    # Resample the price data to get the last price of each month
+    monthly_price = prc.resample('M').last()
 
-    # Convert to PeriodIndex for consistency and readability
-    monthly_returns.index = monthly_returns.index.to_period('M')
+    # Calculate the percentage change to get monthly returns and drop any missing values
+    monthly_return = monthly_price.pct_change().dropna()
 
-    # Filter out any months that don't have at least 18 days of data
-    monthly_days = prc.resample('M').size()
-    valid_months = monthly_days[monthly_days >= 18].index
-    monthly_returns = monthly_returns[monthly_returns.index.isin(valid_months)]
+    # Create a boolean mask where months with at least 18 data points are True
+    count_month = prc.resample('M').count() >= 18
 
-    # Rename the index
-    monthly_returns.index.name = 'Year_Month'
+    # Apply the mask to filter the monthly returns, keeping only months with sufficient data
+    monthly_return = monthly_return[count_month]
 
-    # Set the series name to be the same as the input 'prc' series
-    monthly_returns.name = prc.name
+    # Convert the monthly return's index from datetime to period format with monthly frequency
+    monthly_return.index = monthly_return.index.to_period('M')
 
-    return monthly_returns
+    # Rename the index to indicate the year and month of the return
+    monthly_return.index.name = 'Year_Month'
+
+    # Assign the original price series name to the monthly returns series
+    monthly_return.name = prc.name
+
+    # Return the monthly returns after dropping any remaining missing values
+    return monthly_return.dropna()
 
 
 # ----------------------------------------------------------------------------
@@ -572,4 +582,3 @@ if __name__ == "__main__":
     _test_monthly_return_cal(made_up_data=False, ser_prc=ser_price)
     # test aj_ret_dict function
     _test_aj_ret_dict(['AAPL', 'TSLA'], start='2010-06-25', end='2010-08-05')
-
